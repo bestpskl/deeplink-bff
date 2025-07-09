@@ -9,10 +9,12 @@ import (
 	"deeplink-bff/middleware"
 	"deeplink-bff/pkg/logx"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -93,17 +95,31 @@ func main() {
 		Source:      "deeplink-bff",
 	}
 
-	logFilePath := "/opt/deeplink-bff/logs/app.log"
+	// local file-based logging
+	logDir := "logs"
+	if _, err := os.Stat(logDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to create log directory: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// Open the log file
+	logFilePath := filepath.Join(logDir, "app.log")
 	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		slog.Error("Failed to open log file:", slog.Any("error", err))
+		fmt.Fprintf(os.Stderr, "Failed to open log file: %v\n", err)
+		os.Exit(1)
 	}
+	defer logFile.Close()
+
+	writer := io.MultiWriter(os.Stdout, logFile)
 
 	logger, _ := logx.New(
 		cfgLog,
 		logx.WithAddSource(false),
 		logx.WithLevel(slog.LevelDebug),
-		logx.WithWriter(logFile),
+		logx.WithWriter(writer),
 	)
 
 	slog.SetDefault(logger)
