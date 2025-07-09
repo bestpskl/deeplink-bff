@@ -92,10 +92,18 @@ func main() {
 		Environment: config.Get().Environment,
 		Source:      "deeplink-bff",
 	}
+
+	logFilePath := "/opt/deeplink-bff/logs/app.log"
+	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		slog.Error("Failed to open log file:", slog.Any("error", err))
+	}
+
 	logger, _ := logx.New(
 		cfgLog,
 		logx.WithAddSource(false),
 		logx.WithLevel(slog.LevelDebug),
+		logx.WithWriter(logFile),
 	)
 
 	slog.SetDefault(logger)

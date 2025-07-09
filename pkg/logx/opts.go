@@ -1,6 +1,9 @@
 package logx
 
-import "log/slog"
+import (
+	"io"
+	"log/slog"
+)
 
 // Option is a functional option for configuring the logger.
 type Option func(*optionsConfig) error
@@ -45,6 +48,14 @@ func WithDebugMode(withDebug bool) Option {
 func WithDefaultRedactMessage(defaultRedactMessage string) Option {
 	return func(cfg *optionsConfig) error {
 		cfg.DefaultRedactMessage = defaultRedactMessage
+		return nil
+	}
+}
+
+// WithWriter sets a custom io.Writer for logger output (e.g., file or MultiWriter).
+func WithWriter(w io.Writer) Option {
+	return func(cfg *optionsConfig) error {
+		cfg.Writer = w
 		return nil
 	}
 }

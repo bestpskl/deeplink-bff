@@ -3,6 +3,7 @@ package logx
 import (
 	snake "deeplink-bff/pkg/string"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -23,6 +24,7 @@ type optionsConfig struct {
 	SensitiveKeys        []string `json:"sensitive_keys"`
 	WithDebug            bool     `json:"with_debug"`
 	DefaultRedactMessage string   `json:"default_redact_message"`
+	Writer               io.Writer
 }
 
 type stackFrame struct {
@@ -62,6 +64,7 @@ func New(cfg Config, options ...Option) (*slog.Logger, error) {
 		SensitiveKeys:        []string{},
 		WithDebug:            false,
 		DefaultRedactMessage: DefaultRedactMessage,
+		Writer:               nil,
 	}
 
 	// Validate blacklist during package initialization
@@ -90,7 +93,11 @@ func New(cfg Config, options ...Option) (*slog.Logger, error) {
 		AddSource:   logOpts.AddSource,
 		ReplaceAttr: replaceErrorAttribute,
 	}
-	handler := slog.NewJSONHandler(os.Stdout, opts)
+	out := logOpts.Writer
+	if out == nil {
+		out = os.Stdout
+	}
+	handler := slog.NewJSONHandler(out, opts)
 
 	// Wrap with censoring handler
 	censoringHandler := &censoringHandler{
