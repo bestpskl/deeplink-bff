@@ -72,7 +72,7 @@ func Logger() fiber.Handler {
 		ClientErrorLevel: slog.LevelWarn,
 		ServerErrorLevel: slog.LevelError,
 
-		WithUserAgent:      true,
+		WithUserAgent:      false,
 		WithTraceID:        false,
 		WithSpanID:         false,
 		WithRequestID:      true,
@@ -219,7 +219,7 @@ func LoggerWithConfig(config Config) fiber.Handler {
 
 		// response.stacktrace
 		if status >= http.StatusBadRequest {
-			responseAttributes = append(responseAttributes, slog.Any("stacktrace", marshalStack(3)))
+			responseAttributes = append(responseAttributes, slog.Any("stacktrace", marshalStack(0)))
 		}
 
 		attributes = append(
@@ -246,16 +246,16 @@ func LoggerWithConfig(config Config) fiber.Handler {
 		if status >= http.StatusInternalServerError {
 			level = config.ServerErrorLevel
 			if err != nil {
-				msg = err.Error()
+				msg = extractErrorMessage(err)
 			} else {
-				msg = http.StatusText(status) // Or a generic server error message
+				msg = http.StatusText(status)
 			}
 		} else if status >= http.StatusBadRequest {
 			level = config.ClientErrorLevel
 			if err != nil {
-				msg = err.Error()
+				msg = extractErrorMessage(err)
 			} else {
-				msg = http.StatusText(status) // Or a generic client error message
+				msg = http.StatusText(status)
 			}
 		}
 
@@ -293,9 +293,10 @@ func AddCustomAttributes(c *fiber.Ctx, attr slog.Attr) {
 }
 
 type stackFrame struct {
-	Func   string `json:"func"`
-	Source string `json:"source"`
-	Line   int    `json:"line"`
+	Func     string `json:"func"`
+	Source   string `json:"source"`
+	Line     int    `json:"line"`
+	FullPath string `json:"full_path,omitempty"`
 }
 
 // marshalStack captures the current call stack and parses it into structured frames
@@ -315,13 +316,12 @@ func marshalStack(skip int) []stackFrame {
 		if frame.Function == "" {
 			break
 		}
+
 		s = append(s, stackFrame{
-			Func: filepath.Base(frame.Function),
-			Source: filepath.Join(
-				filepath.Base(filepath.Dir(frame.File)),
-				filepath.Base(frame.File),
-			),
-			Line: frame.Line,
+			Func:     filepath.Base(frame.Function),
+			Source:   filepath.Join(filepath.Base(filepath.Dir(frame.File)), filepath.Base(frame.File)),
+			Line:     frame.Line,
+			FullPath: frame.File,
 		})
 
 		if !more {
@@ -329,4 +329,11 @@ func marshalStack(skip int) []stackFrame {
 		}
 	}
 	return s
+}
+
+func extractErrorMessage(err error) string {
+	if fe, ok := err.(*fiber.Error); ok {
+		return fe.Message
+	}
+	return err.Error()
 }
